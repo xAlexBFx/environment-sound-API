@@ -12,12 +12,12 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy requirements first for better caching
-COPY requirements.txt .
+COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY app_production.py app.py
-COPY .env.example .env
+COPY backend/app_production.py app.py
+COPY backend/.env.example .env
 
 # Create directory for model cache
 RUN mkdir -p /app/models
