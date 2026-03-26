@@ -1,3 +1,12 @@
+---
+title: YAMNet Sound Classifier
+emoji: 🎵
+colorFrom: blue
+colorTo: purple
+sdk: docker
+app_port: 5000
+---
+
 # Environment Sound Classification API
 
 [![GitHub](https://img.shields.io/badge/GitHub-xAlexBFx%2Fenvironment--sound--API-blue)](https://github.com/xAlexBFx/environment-sound-API)
