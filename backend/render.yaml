@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: yamnet-sound-classifier
+    runtime: docker
+    repo: https://github.com/yourusername/your-repo
+    plan: standard
+    envVars:
+      - key: PORT
+        value: 5000
+      - key: HOST
+        value: 0.0.0.0
+      - key: DEBUG
+        value: false
+      - key: LOG_LEVEL
+        value: INFO
+      - key: ALLOWED_ORIGINS
+        value: '*'  # Update with your frontend URL for production
+      - key: RATE_LIMIT_PER_MINUTE
+        value: 60
+      - key: MODEL_CACHE_DIR
+        value: /app/models
+    disk:
+      name: model-cache
+      mountPath: /app/models
+      sizeGB: 2
+    healthCheckPath: /health
+    numInstances: 1
