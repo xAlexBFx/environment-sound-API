@@ -16,4 +16,4 @@ jobs:
       - name: Push to hub
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: git push --force https://xAlexBFx:$HF_TOKEN@huggingface.co/spaces/xAlexBFx/yamnet-sound-classifier main
+        run: git push --force https://AlexDev123:$HF_TOKEN@huggingface.co/spaces/AlexDev123/Environment-Sound-API main
