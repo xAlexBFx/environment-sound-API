@@ -291,8 +291,14 @@ def ratelimit_handler(e):
     return jsonify({'error': 'Rate limit exceeded', 'retry_after': e.description}), 429
 
 
-if __name__ == '__main__':
+# Load model at startup (for gunicorn)
+try:
     load_yamnet()
+except Exception as e:
+    logger.error(f"Failed to load YAMNet at startup: {e}")
+
+
+if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
     host = os.getenv('HOST', '0.0.0.0')
     debug = os.getenv('DEBUG', 'false').lower() == 'true'
