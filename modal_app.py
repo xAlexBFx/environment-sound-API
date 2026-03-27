@@ -216,38 +216,6 @@ def classify_audio(audio_data: str) -> Dict:
         return {"error": f"Classification failed: {str(e)}"}
 
 
-@app.function(
-    image=image,
-    volumes={"/models": model_volume},
-    timeout=300,
-    scaledown_window=300
-)
-@modal.concurrent(max_inputs=10)
-def extract_embeddings(audio_data: str) -> Dict:
-    """Extract YAMNet embeddings for transfer learning"""
-    global yamnet_model, yamnet_class_names
-    
-    # Load model if not already loaded
-    if yamnet_model is None:
-        load_yamnet()
-    
-    # Preprocess audio
-    audio = preprocess_audio(audio_data)
-    if audio is None:
-        return {"error": "Preprocessing failed"}
-    
-    try:
-        _, emb, _ = yamnet_model(audio)
-        avg_embedding = emb.numpy().mean(axis=0).tolist()
-        
-        return {
-            'embedding': avg_embedding,
-            'dimensions': len(avg_embedding)
-        }
-        
-    except Exception as e:
-        logger.error(f"Embedding extraction error: {e}")
-        return {"error": f"Embedding extraction failed: {str(e)}"}
 
 
 @app.function(
@@ -308,8 +276,7 @@ def fastapi_app():
                 '/health': 'GET - Health check',
                 '/info': 'GET - API information', 
                 '/classify': 'POST - Classify audio (returns top prediction)',
-                '/classify/raw': 'POST - Classify audio (returns top 5 predictions)',
-                '/embeddings': 'POST - Extract YAMNet embeddings'
+                '/classify/raw': 'POST - Classify audio (returns top 5 predictions)'
             }
         }
 
@@ -350,18 +317,7 @@ def fastapi_app():
             'totalClasses': result['totalClasses']
         }
 
-    @web_app.post("/embeddings")
-    async def embeddings(request: AudioRequest):
-        """Extract YAMNet embeddings for transfer learning"""
-        if not request.audio:
-            raise HTTPException(status_code=400, detail="No audio data provided")
-        
-        result = extract_embeddings.remote(request.audio)
-        if "error" in result:
-            raise HTTPException(status_code=500, detail=result["error"])
-        
-        return result
-
+    
     return web_app
 
 
