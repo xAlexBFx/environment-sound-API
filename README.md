@@ -4,7 +4,7 @@ emoji: 🎵
 colorFrom: blue
 colorTo: purple
 sdk: docker
-app_port: 5000
+app_port: 7860
 ---
 
 # Environment Sound Classification API
