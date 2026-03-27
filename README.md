@@ -14,7 +14,7 @@ A RESTful API for classifying environmental sounds using Google's YAMNet deep le
 This project provides a Flask-based backend service that accepts audio data via HTTP requests and returns sound classification predictions using the pre-trained YAMNet model from TensorFlow Hub.
 
 **Related Projects:**
-- [Environment Sound Classifier (Frontend)]([https://github.com/xAlexBFx/environment-sound-classifier](https://github.com/xAlexBFx/enviroment-sound-classifier-app)) - Web app that uses this API
+- [Environment Sound Classifier (Frontend)](https://github.com/xAlexBFx/enviroment-sound-classifier-app) - Web app that uses this API
 
 **Key Features:**
 - **521 Audio Classes**: Leverages YAMNet's extensive AudioSet training
