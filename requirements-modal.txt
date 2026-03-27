@@ -1,0 +1,4 @@
+# Modal-specific requirements
+modal>=0.63.0
+fastapi>=0.104.0
+uvicorn>=0.24.0
