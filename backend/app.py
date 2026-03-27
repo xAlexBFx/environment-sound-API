@@ -11,6 +11,27 @@ CORS(app)
 yamnet_model = None
 yamnet_class_names = None
 
+# Urban sound classes (10 classes for UrbanSound8K)
+CLASS_NAMES = [
+    'air_conditioner', 'car_horn', 'children_playing', 'dog_bark',
+    'drilling', 'engine_idling', 'gun_shot', 'jackhammer', 
+    'siren', 'street_music'
+]
+
+# Mapping from YAMNet classes to our urban classes (simplified)
+YAMNET_TO_URBAN = {
+    'air_conditioner': [384, 385],
+    'car_horn': [390, 391],
+    'children_playing': [420, 421],
+    'dog_bark': [80, 81],
+    'drilling': [347, 348],
+    'engine_idling': [343, 344],
+    'gun_shot': [399, 400],
+    'jackhammer': [401, 402],
+    'siren': [389, 390],
+    'street_music': [100, 101]
+}
+
 
 def load_yamnet_classes():
     """Load YAMNet's 521 class names from CSV"""

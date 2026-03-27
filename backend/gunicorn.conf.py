@@ -4,11 +4,11 @@ import multiprocessing
 bind = "0.0.0.0:5000"
 backlog = 2048
 
-# Worker processes - use 2 workers (more can cause memory issues with TensorFlow)
-workers = 2
+# Worker processes - use 1 worker for HuggingFace Spaces memory constraints
+workers = 1
 worker_class = "sync"
 worker_connections = 1000
-timeout = 120
+timeout = 300
 keepalive = 2
 
 # Preload app to share model in memory
