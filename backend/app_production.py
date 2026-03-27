@@ -15,6 +15,9 @@ import os
 import logging
 from dotenv import load_dotenv
 import tempfile
+import time
+import psutil
+import signal
 
 # Load environment variables
 load_dotenv()
@@ -193,20 +196,19 @@ def info():
 
 
 @app.route('/classify', methods=['POST'])
+@limiter.limit("10 per minute")
 def classify():
     """Main classification endpoint - returns top YAMNet AudioSet class"""
-    # Retry model loading if needed
-    global yamnet_model
-    if yamnet_model is None:
-        try:
-            logger.info("Attempting to reload YAMNet model...")
-            load_yamnet()
-        except Exception as e:
-            logger.error(f"Failed to reload YAMNet: {e}")
-            return jsonify({'error': 'Model temporarily unavailable - retrying'}), 503
+    start_time = time.time()
+    process = psutil.Process()
     
+    # Log memory usage at start
+    memory_before = process.memory_info().rss / 1024 / 1024  # MB
+    logger.info(f"Request started - Memory: {memory_before:.1f}MB")
+    
+    # Check if model is loaded (no retry during request)
     if yamnet_model is None:
-        return jsonify({'error': 'YAMNet not loaded'}), 500
+        return jsonify({'error': 'Model not loaded - please restart server'}), 503
     
     # Check content length to prevent memory issues
     content_length = request.content_length
@@ -217,34 +219,53 @@ def classify():
     if not data or 'audio' not in data:
         return jsonify({'error': 'No audio data'}), 400
     
-    audio = preprocess_audio(data['audio'])
-    if audio is None:
-        return jsonify({'error': 'Preprocessing failed'}), 400
-    
-    # Run YAMNet inference
-    scores, embeddings, _ = yamnet_model(audio)
-    avg_scores = scores.numpy().mean(axis=0)
-    
-    # Get top prediction from YAMNet's 521 classes
-    predicted_idx = np.argmax(avg_scores)
-    confidence = float(avg_scores[predicted_idx])
-    predicted_class = yamnet_class_names[predicted_idx] if yamnet_class_names and predicted_idx < len(yamnet_class_names) else "unknown"
-    
-    # Get top 5 YAMNet predictions for display
-    top_5_indices = avg_scores.argsort()[-5:][::-1]
-    top_predictions = {
-        yamnet_class_names[i] if yamnet_class_names and i < len(yamnet_class_names) else f"class_{i}": float(avg_scores[i])
-        for i in top_5_indices
-    }
-    
-    return jsonify({
-        'className': predicted_class if confidence >= 0.6 else 'uncertain',
-        'confidence': confidence,
-        'allProbabilities': top_predictions,
-        'model': 'yamnet',
-        'classIndex': int(predicted_idx),
-        'totalClasses': len(yamnet_class_names) if yamnet_class_names else 521
-    })
+    try:
+        audio = preprocess_audio(data['audio'])
+        if audio is None:
+            return jsonify({'error': 'Preprocessing failed'}), 400
+        
+        # Check memory after preprocessing
+        memory_after_preprocess = process.memory_info().rss / 1024 / 1024
+        logger.info(f"After preprocessing - Memory: {memory_after_preprocess:.1f}MB")
+        
+        # Run YAMNet inference with timeout protection
+        inference_start = time.time()
+        scores, embeddings, _ = yamnet_model(audio)
+        avg_scores = scores.numpy().mean(axis=0)
+        inference_time = time.time() - inference_start
+        
+        # Get top prediction from YAMNet's 521 classes
+        predicted_idx = np.argmax(avg_scores)
+        confidence = float(avg_scores[predicted_idx])
+        predicted_class = yamnet_class_names[predicted_idx] if yamnet_class_names and predicted_idx < len(yamnet_class_names) else "unknown"
+        
+        # Get top 5 YAMNet predictions for display
+        top_5_indices = avg_scores.argsort()[-5:][::-1]
+        top_predictions = {
+            yamnet_class_names[i] if yamnet_class_names and i < len(yamnet_class_names) else f"class_{i}": float(avg_scores[i])
+            for i in top_5_indices
+        }
+        
+        # Log completion stats
+        total_time = time.time() - start_time
+        memory_final = process.memory_info().rss / 1024 / 1024
+        logger.info(f"Request completed - Time: {total_time:.2f}s, Inference: {inference_time:.2f}s, Memory: {memory_final:.1f}MB")
+        
+        return jsonify({
+            'className': predicted_class if confidence >= 0.6 else 'uncertain',
+            'confidence': confidence,
+            'allProbabilities': top_predictions,
+            'model': 'yamnet',
+            'classIndex': int(predicted_idx),
+            'totalClasses': len(yamnet_class_names) if yamnet_class_names else 521,
+            'processing_time': total_time
+        })
+        
+    except Exception as e:
+        total_time = time.time() - start_time
+        memory_error = process.memory_info().rss / 1024 / 1024
+        logger.error(f"Request failed after {total_time:.2f}s - Memory: {memory_error:.1f}MB - Error: {e}")
+        return jsonify({'error': f'Processing failed: {str(e)}'}), 500
 
 
 @app.route('/classify/raw', methods=['POST'])
