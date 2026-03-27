@@ -193,7 +193,6 @@ def info():
 
 
 @app.route('/classify', methods=['POST'])
-@limiter.limit("10 per minute")
 def classify():
     """Main classification endpoint - returns top YAMNet AudioSet class"""
     # Retry model loading if needed
@@ -249,7 +248,6 @@ def classify():
 
 
 @app.route('/classify/raw', methods=['POST'])
-@limiter.limit("30 per minute")
 def classify_raw():
     """Raw YAMNet classification (521 classes)"""
     if yamnet_model is None:
@@ -285,7 +283,6 @@ def classify_raw():
 
 
 @app.route('/embeddings', methods=['POST'])
-@limiter.limit("30 per minute")
 def embeddings():
     """Extract YAMNet embeddings for transfer learning"""
     if yamnet_model is None:
