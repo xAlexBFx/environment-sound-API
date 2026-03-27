@@ -28,7 +28,9 @@ image = modal.Image.debian_slim(python_version="3.11").apt_install(
     "scipy==1.11.4",
     "soundfile==0.12.1",
     "audioread==3.0.1",
-    "psutil==5.9.6"
+    "psutil==5.9.6",
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0"
 )
 
 # Configure logging
@@ -167,9 +169,9 @@ def preprocess_audio(audio_data: str, sample_rate: int = 22050) -> Optional[np.n
     image=image,
     volumes={"/models": model_volume},
     timeout=300,
-    container_idle_timeout=300,
-    allow_concurrent_inputs=10
+    scaledown_window=300
 )
+@modal.concurrent(max_inputs=10)
 def classify_audio(audio_data: str) -> Dict:
     """Classify audio using YAMNet model"""
     global yamnet_model, yamnet_class_names
@@ -218,9 +220,9 @@ def classify_audio(audio_data: str) -> Dict:
     image=image,
     volumes={"/models": model_volume},
     timeout=300,
-    container_idle_timeout=300,
-    allow_concurrent_inputs=10
+    scaledown_window=300
 )
+@modal.concurrent(max_inputs=10)
 def extract_embeddings(audio_data: str) -> Dict:
     """Extract YAMNet embeddings for transfer learning"""
     global yamnet_model, yamnet_class_names
@@ -262,114 +264,123 @@ def health_check() -> Dict:
 
 
 # FastAPI web server for HTTP endpoints
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-import uvicorn
-
-web_app = FastAPI(title="YAMNet Sound Classification API")
-
-# Add CORS middleware
-web_app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-class AudioRequest(BaseModel):
-    audio: str
-
-
-@web_app.get("/health")
-async def health():
-    """Health check endpoint"""
-    result = health_check.remote()
-    return result
-
-
-@web_app.get("/info")
-async def info():
-    """API information endpoint"""
-    return {
-        'name': 'YAMNet Sound Classification API',
-        'version': '1.0.0',
-        'model': 'YAMNet',
-        'classes': 521,
-        'endpoints': {
-            '/health': 'GET - Health check',
-            '/info': 'GET - API information', 
-            '/classify': 'POST - Classify audio (returns top prediction)',
-            '/classify/raw': 'POST - Classify audio (returns top 5 predictions)',
-            '/embeddings': 'POST - Extract YAMNet embeddings'
-        }
-    }
-
-
-@web_app.post("/classify")
-async def classify(request: AudioRequest):
-    """Main classification endpoint - returns top YAMNet AudioSet class"""
-    if not request.audio:
-        raise HTTPException(status_code=400, detail="No audio data provided")
-    
-    result = classify_audio.remote(request.audio)
-    if "error" in result:
-        raise HTTPException(status_code=500, detail=result["error"])
-    
-    return result
-
-
-@web_app.post("/classify/raw")
-async def classify_raw(request: AudioRequest):
-    """Raw YAMNet classification (521 classes)"""
-    if not request.audio:
-        raise HTTPException(status_code=400, detail="No audio data provided")
-    
-    result = classify_audio.remote(request.audio)
-    if "error" in result:
-        raise HTTPException(status_code=500, detail=result["error"])
-    
-    # Format for raw endpoint
-    top_5 = [
-        {
-            'className': class_name,
-            'confidence': confidence
-        }
-        for class_name, confidence in list(result['allProbabilities'].items())[:5]
-    ]
-    
-    return {
-        'topPredictions': top_5,
-        'model': 'yamnet',
-        'totalClasses': result['totalClasses']
-    }
-
-
-@web_app.post("/embeddings")
-async def embeddings(request: AudioRequest):
-    """Extract YAMNet embeddings for transfer learning"""
-    if not request.audio:
-        raise HTTPException(status_code=400, detail="No audio data provided")
-    
-    result = extract_embeddings.remote(request.audio)
-    if "error" in result:
-        raise HTTPException(status_code=500, detail=result["error"])
-    
-    return result
-
-
 @app.function(
     image=image,
-    allow_concurrent_inputs=50,
     timeout=30
 )
+@modal.concurrent(max_inputs=50)
 @modal.asgi_app()
 def fastapi_app():
+    # Import FastAPI inside the function to ensure it's available in the Modal container
+    from fastapi import FastAPI, HTTPException
+    from fastapi.middleware.cors import CORSMiddleware
+    from pydantic import BaseModel
+    
+    web_app = FastAPI(title="YAMNet Sound Classification API")
+
+    # Add CORS middleware
+    web_app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    class AudioRequest(BaseModel):
+        audio: str
+
+    @web_app.get("/health")
+    async def health():
+        """Health check endpoint"""
+        result = health_check.remote()
+        return result
+
+    @web_app.get("/info")
+    async def info():
+        """API information endpoint"""
+        return {
+            'name': 'YAMNet Sound Classification API',
+            'version': '1.0.0',
+            'model': 'YAMNet',
+            'classes': 521,
+            'endpoints': {
+                '/health': 'GET - Health check',
+                '/info': 'GET - API information', 
+                '/classify': 'POST - Classify audio (returns top prediction)',
+                '/classify/raw': 'POST - Classify audio (returns top 5 predictions)',
+                '/embeddings': 'POST - Extract YAMNet embeddings'
+            }
+        }
+
+    @web_app.post("/classify")
+    async def classify(request: AudioRequest):
+        """Main classification endpoint - returns top YAMNet AudioSet class"""
+        if not request.audio:
+            raise HTTPException(status_code=400, detail="No audio data provided")
+        
+        result = classify_audio.remote(request.audio)
+        if "error" in result:
+            raise HTTPException(status_code=500, detail=result["error"])
+        
+        return result
+
+    @web_app.post("/classify/raw")
+    async def classify_raw(request: AudioRequest):
+        """Raw YAMNet classification (521 classes)"""
+        if not request.audio:
+            raise HTTPException(status_code=400, detail="No audio data provided")
+        
+        result = classify_audio.remote(request.audio)
+        if "error" in result:
+            raise HTTPException(status_code=500, detail=result["error"])
+        
+        # Format for raw endpoint
+        top_5 = [
+            {
+                'className': class_name,
+                'confidence': confidence
+            }
+            for class_name, confidence in list(result['allProbabilities'].items())[:5]
+        ]
+        
+        return {
+            'topPredictions': top_5,
+            'model': 'yamnet',
+            'totalClasses': result['totalClasses']
+        }
+
+    @web_app.post("/embeddings")
+    async def embeddings(request: AudioRequest):
+        """Extract YAMNet embeddings for transfer learning"""
+        if not request.audio:
+            raise HTTPException(status_code=400, detail="No audio data provided")
+        
+        result = extract_embeddings.remote(request.audio)
+        if "error" in result:
+            raise HTTPException(status_code=500, detail=result["error"])
+        
+        return result
+
     return web_app
 
 
 if __name__ == "__main__":
-    # For local testing
-    import uvicorn
-    uvicorn.run(web_app, host="0.0.0.0", port=8000)
+    # For local testing - create a simple Flask app
+    from flask import Flask, request, jsonify
+    
+    app = Flask(__name__)
+    
+    @app.route('/health')
+    def health():
+        return jsonify({'status': 'healthy', 'service': 'yamnet-sound-classifier'})
+    
+    @app.route('/info')
+    def info():
+        return jsonify({
+            'name': 'YAMNet Sound Classification API',
+            'version': '1.0.0',
+            'message': 'Use Modal deployment for full functionality'
+        })
+    
+    app.run(host="0.0.0.0", port=8000)

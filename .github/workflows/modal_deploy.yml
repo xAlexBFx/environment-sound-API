@@ -1,0 +1,49 @@
+name: Deploy to Modal
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'modal_app.py'
+      - 'backend/**'
+      - '.github/workflows/modal_deploy.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+      MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Modal
+        run: pip install modal
+
+      - name: Deploy to Modal
+        run: modal deploy modal_app.py
+
+      - name: Get App URL
+        id: get-url
+        run: |
+          URL=$(modal app show yamnet-sound-classifier --url)
+          echo "url=$URL" >> $GITHUB_OUTPUT
+
+      - name: Comment PR with URL
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const url = '${{ steps.get-url.outputs.url }}';
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `🚀 **Modal Deployment Successful!**\n\nYour YAMNet Sound Classification API is now live at:\n${url}\n\n**Available Endpoints:**\n- \`GET ${url}/health\` - Health check\n- \`GET ${url}/info\` - API information\n- \`POST ${url}/classify\` - Classify audio\n- \`POST ${url}/embeddings\` - Extract embeddings`
+            });
