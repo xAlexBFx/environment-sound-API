@@ -7,10 +7,6 @@ sdk: docker
 app_port: 7860
 ---
 
-# Environment Sound Classification API
-
-[![GitHub](https://img.shields.io/badge/GitHub-xAlexBFx%2Fenvironment--sound--API-blue)](https://github.com/xAlexBFx/environment-sound-API)
-
 A RESTful API for classifying environmental sounds using Google's YAMNet deep learning model. The API can identify 521 different audio classes including urban sounds like sirens, car horns, engine noise, and more.
 
 ## Overview
@@ -18,7 +14,7 @@ A RESTful API for classifying environmental sounds using Google's YAMNet deep le
 This project provides a Flask-based backend service that accepts audio data via HTTP requests and returns sound classification predictions using the pre-trained YAMNet model from TensorFlow Hub.
 
 **Related Projects:**
-- [Environment Sound Classifier (Frontend)](https://github.com/xAlexBFx/environment-sound-classifier) - Web app that uses this API
+- [Environment Sound Classifier (Frontend)]([https://github.com/xAlexBFx/environment-sound-classifier](https://github.com/xAlexBFx/enviroment-sound-classifier-app)) - Web app that uses this API
 
 **Key Features:**
 - **521 Audio Classes**: Leverages YAMNet's extensive AudioSet training
