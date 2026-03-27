@@ -77,9 +77,15 @@ def load_yamnet():
     global yamnet_model, yamnet_class_names
     try:
         logger.info("Loading YAMNet from TensorFlow Hub...")
-        cache_dir = os.getenv('MODEL_CACHE_DIR')
-        if cache_dir:
-            os.environ['TFHUB_CACHE_DIR'] = cache_dir
+        
+        # Optimize for memory constraints
+        import tensorflow as tf
+        tf.config.experimental.set_memory_growth(
+            tf.config.experimental.list_physical_devices('GPU')[0], True
+        ) if tf.config.experimental.list_physical_devices('GPU') else None
+        
+        cache_dir = os.getenv('MODEL_CACHE_DIR', '/app/models')
+        os.environ['TFHUB_CACHE_DIR'] = cache_dir
         
         yamnet_model = hub.load('https://tfhub.dev/google/yamnet/1')
         logger.info("YAMNet loaded successfully!")
@@ -88,7 +94,8 @@ def load_yamnet():
         logger.info(f"Loaded {len(yamnet_class_names)} YAMNet class names")
     except Exception as e:
         logger.error(f"Error loading YAMNet: {e}")
-        raise
+        # Don't raise - let the app start with graceful degradation
+        logger.warning("Application will start but classification will fail until model loads")
 
 
 def preprocess_audio(audio_data, sample_rate=22050):
@@ -186,11 +193,26 @@ def info():
 
 
 @app.route('/classify', methods=['POST'])
-@limiter.limit("30 per minute")
+@limiter.limit("10 per minute")
 def classify():
     """Main classification endpoint - returns top YAMNet AudioSet class"""
+    # Retry model loading if needed
+    global yamnet_model
+    if yamnet_model is None:
+        try:
+            logger.info("Attempting to reload YAMNet model...")
+            load_yamnet()
+        except Exception as e:
+            logger.error(f"Failed to reload YAMNet: {e}")
+            return jsonify({'error': 'Model temporarily unavailable - retrying'}), 503
+    
     if yamnet_model is None:
         return jsonify({'error': 'YAMNet not loaded'}), 500
+    
+    # Check content length to prevent memory issues
+    content_length = request.content_length
+    if content_length and content_length > 5 * 1024 * 1024:  # 5MB limit
+        return jsonify({'error': 'Audio data too large'}), 413
     
     data = request.get_json()
     if not data or 'audio' not in data:

@@ -29,5 +29,5 @@ EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD python -c "import requests; requests.get('http://localhost:5000/health')" || exit 1
 
-# Run with gunicorn
-CMD ["gunicorn", "-w", "2", "-b", "0.0.0.0:5000", "-t", "120", "--preload", "app:app"]
+# Run with gunicorn (optimized for HF free tier)
+CMD ["gunicorn", "-w", "1", "-b", "0.0.0.0:5000", "-t", "300", "--preload", "--max-requests", "10", "--max-requests-jitter", "5", "app:app"]
