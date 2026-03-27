@@ -13,7 +13,7 @@ from typing import Dict, List, Optional, Tuple
 import modal
 
 # Configure Modal app
-app = modal.App("yamnet-sound-classifier")
+app = modal.App("environment-sound-api")
 
 # Define Modal image with all dependencies
 image = modal.Image.debian_slim(python_version="3.11").apt_install(
@@ -226,7 +226,7 @@ def health_check() -> Dict:
     """Health check endpoint"""
     return {
         'status': 'healthy',
-        'service': 'yamnet-sound-classifier',
+        'service': 'environment-sound-api',
         'version': '1.0.0'
     }
 
@@ -244,7 +244,7 @@ def fastapi_app():
     from fastapi.middleware.cors import CORSMiddleware
     from pydantic import BaseModel
     
-    web_app = FastAPI(title="YAMNet Sound Classification API")
+    web_app = FastAPI(title="Environment Sound API")
 
     # Add CORS middleware
     web_app.add_middleware(
@@ -268,7 +268,7 @@ def fastapi_app():
     async def info():
         """API information endpoint"""
         return {
-            'name': 'YAMNet Sound Classification API',
+            'name': 'Environment Sound API',
             'version': '1.0.0',
             'model': 'YAMNet',
             'classes': 521,
@@ -329,12 +329,12 @@ if __name__ == "__main__":
     
     @app.route('/health')
     def health():
-        return jsonify({'status': 'healthy', 'service': 'yamnet-sound-classifier'})
+        return jsonify({'status': 'healthy', 'service': 'environment-sound-api'})
     
     @app.route('/info')
     def info():
         return jsonify({
-            'name': 'YAMNet Sound Classification API',
+            'name': 'Environment Sound API',
             'version': '1.0.0',
             'message': 'Use Modal deployment for full functionality'
         })
