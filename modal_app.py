@@ -77,12 +77,22 @@ def load_yamnet():
     try:
         logger.info("Loading YAMNet from TensorFlow Hub...")
         
-        # Optimize for memory constraints
+        # Configure TensorFlow for GPU
         import tensorflow as tf
-        if tf.config.experimental.list_physical_devices('GPU'):
-            tf.config.experimental.set_memory_growth(
-                tf.config.experimental.list_physical_devices('GPU')[0], True
-            )
+        
+        # Check for GPU availability
+        gpus = tf.config.experimental.list_physical_devices('GPU')
+        if gpus:
+            logger.info(f"GPU detected: {len(gpus)} device(s)")
+            try:
+                # Enable memory growth to avoid allocating all GPU memory at once
+                for gpu in gpus:
+                    tf.config.experimental.set_memory_growth(gpu, True)
+                logger.info("GPU memory growth enabled")
+            except RuntimeError as e:
+                logger.warning(f"GPU configuration error: {e}")
+        else:
+            logger.info("No GPU detected, using CPU")
         
         # Set cache directory to persistent volume
         cache_dir = "/models"
@@ -169,7 +179,9 @@ def preprocess_audio(audio_data: str, sample_rate: int = 22050) -> Optional[np.n
     image=image,
     volumes={"/models": model_volume},
     timeout=300,
-    scaledown_window=300
+    scaledown_window=300,
+    gpu="T4",
+    memory=8192
 )
 @modal.concurrent(max_inputs=10)
 def classify_audio(audio_data: str) -> Dict:
@@ -234,7 +246,9 @@ def health_check() -> Dict:
 # FastAPI web server for HTTP endpoints
 @app.function(
     image=image,
-    timeout=30
+    timeout=30,
+    gpu="T4",
+    memory=4096
 )
 @modal.concurrent(max_inputs=50)
 @modal.asgi_app()
@@ -286,7 +300,7 @@ def fastapi_app():
         if not request.audio:
             raise HTTPException(status_code=400, detail="No audio data provided")
         
-        result = classify_audio.remote(request.audio)
+        result = await classify_audio.remote.aio(request.audio)
         if "error" in result:
             raise HTTPException(status_code=500, detail=result["error"])
         
@@ -298,7 +312,7 @@ def fastapi_app():
         if not request.audio:
             raise HTTPException(status_code=400, detail="No audio data provided")
         
-        result = classify_audio.remote(request.audio)
+        result = await classify_audio.remote.aio(request.audio)
         if "error" in result:
             raise HTTPException(status_code=500, detail=result["error"])
         
